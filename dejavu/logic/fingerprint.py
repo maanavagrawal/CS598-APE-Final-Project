@@ -23,7 +23,7 @@ try:
     USE_CPP_IMPLEMENTATION = True
 except ImportError:
     USE_CPP_IMPLEMENTATION = False
-    print("C++ extension not available, falling back to Python implementation")
+    print("Using Python implementation")
 
 def fingerprint(channel_samples: List[int],
                 Fs: int = DEFAULT_FS,
