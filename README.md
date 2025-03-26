@@ -1,7 +1,7 @@
 **install requirements**
-
+```
 pip3 install -r requirements.txt
-
+```
 **setup.py**
 
 How to run:
@@ -10,8 +10,9 @@ cd nostalgia
 python3 setup.py build_ext --inplace
 ```
 **Test C++ implementation:**
+```
 python3 test_fingerprint_pybind.py
-
+```
 dejavu
 ==========
 
