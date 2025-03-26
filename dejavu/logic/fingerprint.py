@@ -17,6 +17,13 @@ from dejavu.config.settings import (CONNECTIVITY_MASK, DEFAULT_AMP_MIN,
                                     MIN_HASH_TIME_DELTA,
                                     PEAK_NEIGHBORHOOD_SIZE, PEAK_SORT)
 
+# Import the C++ extension from the nostalgia package
+try:
+    from nostalgia.fingerprint_pybind import generate_hashes as cpp_generate_hashes
+    USE_CPP_IMPLEMENTATION = True
+except ImportError:
+    USE_CPP_IMPLEMENTATION = False
+    print("C++ extension not available, falling back to Python implementation")
 
 def fingerprint(channel_samples: List[int],
                 Fs: int = DEFAULT_FS,
@@ -48,8 +55,18 @@ def fingerprint(channel_samples: List[int],
 
     local_maxima = get_2D_peaks(arr2D, plot=False, amp_min=amp_min)
 
-    # return hashes
-    return generate_hashes(local_maxima, fan_value=fan_value)
+    # Use C++ implementation if available, otherwise use Python implementation
+    if USE_CPP_IMPLEMENTATION:
+        return cpp_generate_hashes(
+            local_maxima, 
+            fan_value=fan_value,
+            peak_sort=PEAK_SORT,
+            min_hash_time_delta=MIN_HASH_TIME_DELTA,
+            max_hash_time_delta=MAX_HASH_TIME_DELTA,
+            fingerprint_reduction=FINGERPRINT_REDUCTION
+        )
+    else:
+        return generate_hashes_py(local_maxima, fan_value=fan_value)
 
 
 def get_2D_peaks(arr2D: np.array, plot: bool = False, amp_min: int = DEFAULT_AMP_MIN)\
@@ -119,7 +136,8 @@ def get_2D_peaks(arr2D: np.array, plot: bool = False, amp_min: int = DEFAULT_AMP
     return list(zip(freqs_filter, times_filter))
 
 
-def generate_hashes(peaks: List[Tuple[int, int]], fan_value: int = DEFAULT_FAN_VALUE) -> List[Tuple[str, int]]:
+# Rename the original Python implementation for reference/fallback
+def generate_hashes_py(peaks: List[Tuple[int, int]], fan_value: int = DEFAULT_FAN_VALUE) -> List[Tuple[str, int]]:
     """
     Hash list structure:
        sha1_hash[0:FINGERPRINT_REDUCTION]    time_offset
