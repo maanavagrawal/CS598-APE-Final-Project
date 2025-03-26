@@ -7,6 +7,7 @@
 #include <sstream>
 #include <iomanip>
 #include <chrono>
+#include <omp.h>
 
 namespace py = pybind11;
 
@@ -42,27 +43,47 @@ std::tuple<std::vector<std::tuple<std::string, int>>, double> generate_hashes(
         sorted_peaks = peaks;
     }
 
+    size_t total_peaks = sorted_peaks.size();
+    size_t max_hashes = total_peaks * (fan_value - 1);
     std::vector<std::tuple<std::string, int>> hashes;
-    
-    for (size_t i = 0; i < sorted_peaks.size(); i++) {
-        for (int j = 1; j < fan_value; j++) {
-            if (i + j < sorted_peaks.size()) {
-                int freq1 = std::get<0>(sorted_peaks[i]);
-                int freq2 = std::get<0>(sorted_peaks[i + j]);
-                int t1 = std::get<1>(sorted_peaks[i]);
-                int t2 = std::get<1>(sorted_peaks[i + j]);
-                int t_delta = t2 - t1;
+    hashes.reserve(max_hashes);
 
-                if (min_hash_time_delta <= t_delta && t_delta <= max_hash_time_delta) {
-                    std::stringstream key;
-                    key << freq1 << "|" << freq2 << "|" << t_delta;
-                    std::string hash_str = sha1_hash(key.str());
-                    hash_str = hash_str.substr(0, fingerprint_reduction);
-                    hashes.emplace_back(hash_str, t1);
+    std::vector<std::vector<std::tuple<std::string, int>>> thread_results(omp_get_max_threads());
+
+    #pragma omp parallel
+    {
+        int thread_id = omp_get_thread_num();
+        auto& thread_hashes = thread_results[thread_id];
+        thread_hashes.reserve(max_hashes / omp_get_num_threads());
+
+        #pragma omp for schedule(dynamic, 100)
+        for (size_t i = 0; i < total_peaks; i++) {
+            for (int j = 1; j < fan_value; j++) {
+                if (i + j < total_peaks) {
+                    int freq1 = std::get<0>(sorted_peaks[i]);
+                    int freq2 = std::get<0>(sorted_peaks[i + j]);
+                    int t1 = std::get<1>(sorted_peaks[i]);
+                    int t2 = std::get<1>(sorted_peaks[i + j]);
+                    int t_delta = t2 - t1;
+
+                    if (min_hash_time_delta <= t_delta && t_delta <= max_hash_time_delta) {
+                        std::stringstream key;
+                        key << freq1 << "|" << freq2 << "|" << t_delta;
+                        std::string hash_str = sha1_hash(key.str());
+                        hash_str = hash_str.substr(0, fingerprint_reduction);
+                        thread_hashes.emplace_back(hash_str, t1);
+                    }
                 }
             }
         }
+
     }
+
+    #pragma omp critical
+    for (const auto& thread_result : thread_results) {
+        hashes.insert(hashes.end(), thread_result.begin(), thread_result.end());
+    }
+
     auto end_time = high_resolution_clock::now();
     double execution_time = duration_cast<microseconds>(end_time - start_time).count() / 1000000.0;
     

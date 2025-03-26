@@ -14,9 +14,10 @@ ext_modules = [
     Pybind11Extension(
         'fingerprint_pybind',
         ['fingerprint_pybind.cpp'],
-        libraries=['crypto'],
-        extra_compile_args=['-std=c++11', '-O3'],
-    ),
+        libraries=['crypto', 'gomp'],
+        extra_compile_args=['-std=c++11', '-O3', '-fopenmp'],
+        extra_link_args=['-fopenmp'],
+    )
 ]
 setup(
     name='nostalgia',
