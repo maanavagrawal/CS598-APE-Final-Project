@@ -84,7 +84,6 @@ generate_hashes(const std::vector<std::tuple<int, int>> &peaks,
     }
   }
 
-#pragma omp critical
   for (const auto &thread_result : thread_results) {
     hashes.insert(hashes.end(), thread_result.begin(), thread_result.end());
   }
