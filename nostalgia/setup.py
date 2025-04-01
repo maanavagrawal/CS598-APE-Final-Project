@@ -15,7 +15,7 @@ ext_modules = [
         'fingerprint_pybind',
         ['fingerprint_pybind.cpp'],
         libraries=['crypto', 'gomp'],
-        extra_compile_args=['-std=c++11', '-O3', '-fopenmp'],
+        extra_compile_args=['-std=c++11', '-O3', '-fopenmp', '-g'],
         extra_link_args=['-fopenmp'],
     )
 ]
