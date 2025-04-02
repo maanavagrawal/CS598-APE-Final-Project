@@ -1,7 +1,8 @@
+#include "hash/sha1.h"
 #include <chrono>
 #include <iomanip>
 #include <omp.h>
-#include <openssl/sha.h>
+// #include <openssl/sha.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <sstream>
@@ -13,8 +14,10 @@ namespace py = pybind11;
 
 std::string sha1_hash(const std::string &input) {
   unsigned char hash[SHA_DIGEST_LENGTH];
-  SHA1(reinterpret_cast<const unsigned char *>(input.c_str()), input.length(),
-       hash);
+  //   SHA1(reinterpret_cast<const unsigned char *>(input.c_str()),
+  //   input.length(),
+  //        hash);
+  SHA1((char *)hash, input.c_str(), input.length());
 
   std::string result(SHA_DIGEST_LENGTH * 2, '0');
 

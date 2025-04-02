@@ -13,8 +13,9 @@ REQUIREMENTS = parse_requirements("requirements.txt")
 ext_modules = [
     Pybind11Extension(
         'fingerprint_pybind',
-        ['fingerprint_pybind.cpp'],
-        libraries=['crypto', 'gomp'],
+        ['fingerprint_pybind.cpp', 'hash/sha1.c'],
+        include_dirs=['hash'],
+        libraries=['gomp'],
         extra_compile_args=['-std=c++11', '-O3', '-fopenmp', '-g'],
         extra_link_args=['-fopenmp'],
     )
