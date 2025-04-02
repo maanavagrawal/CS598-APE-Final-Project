@@ -5,3 +5,8 @@ mp3
 *.mp3
 .DS_Store
 *.cnf
+*.data
+*.data.old
+*.so
+*.o
+build/
