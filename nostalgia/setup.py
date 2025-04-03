@@ -16,7 +16,7 @@ ext_modules = [
         ['fingerprint_pybind.cpp', 'hash/sha1.c'],
         include_dirs=['hash'],
         libraries=['gomp'],
-        extra_compile_args=['-std=c++11', '-O3', '-fopenmp', '-g'],
+        extra_compile_args=['-std=c++17', '-O3', '-fopenmp', '-g'],
         extra_link_args=['-fopenmp'],
     )
 ]
