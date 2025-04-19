@@ -19,7 +19,11 @@ from dejavu.config.settings import (CONNECTIVITY_MASK, DEFAULT_AMP_MIN,
 
 # Import the C++ extension from the nostalgia package
 try:
-    from nostalgia.fingerprint_pybind import generate_hashes as cpp_generate_hashes
+    from nostalgia.fingerprint_pybind import (
+        generate_hashes as cpp_generate_hashes,
+        get_2D_peaks_cpp,
+        peaks_to_coordinates
+    )
     USE_CPP_IMPLEMENTATION = True
 except ImportError:
     USE_CPP_IMPLEMENTATION = False
@@ -42,7 +46,6 @@ def fingerprint(channel_samples: List[int],
     :param amp_min: minimum amplitude in spectrogram in order to be considered a peak.
     :return: a list of hashes with their corresponding offsets.
     """
-    # FFT the signal and extract frequency components
     arr2D = mlab.specgram(
         channel_samples,
         NFFT=wsize,
@@ -50,13 +53,13 @@ def fingerprint(channel_samples: List[int],
         window=mlab.window_hanning,
         noverlap=int(wsize * wratio))[0]
 
-    # Apply log transform since specgram function returns linear array. 0s are excluded to avoid np warning.
     arr2D = 10 * np.log10(arr2D, out=np.zeros_like(arr2D), where=(arr2D != 0))
 
     local_maxima = get_2D_peaks(arr2D, plot=False, amp_min=amp_min)
 
-    # Use C++ implementation if available, otherwise use Python implementation
     if USE_CPP_IMPLEMENTATION:
+        local_maxima = get_2D_peaks_cpp_wrapper(arr2D, amp_min=amp_min)
+        
         hashes, execution_time = cpp_generate_hashes(
             local_maxima, 
             fan_value=fan_value,
@@ -65,11 +68,26 @@ def fingerprint(channel_samples: List[int],
             max_hash_time_delta=MAX_HASH_TIME_DELTA,
             fingerprint_reduction=FINGERPRINT_REDUCTION
         )
-        print(f"Execution time: {execution_time} seconds")
         return hashes
     else:
+        local_maxima = get_2D_peaks(arr2D, plot=False, amp_min=amp_min)
         return generate_hashes_py(local_maxima, fan_value=fan_value)
 
+def get_2D_peaks_cpp_wrapper(arr2D: np.array, fraction: float = 0.1, condition: int = 2, amp_min: int = DEFAULT_AMP_MIN) -> List[Tuple[int, int]]:
+    """
+    Extract maximum peaks from the spectogram matrix using the C++ implementation.
+    
+    :param arr2D: matrix representing the spectogram.
+    :param fraction: fraction of spectrogram to compute local comparisons.
+    :param condition: axis in which to search for peaks (0=time, 1=frequency, 2=both).
+    :param amp_min: minimum amplitude in spectrogram to be considered a peak.
+    :return: a list of tuples containing frequency and time indices of the peaks.
+    """
+    peak_locations, peak_values = get_2D_peaks_cpp(arr2D, fraction, condition, amp_min)
+    
+    coordinates = peaks_to_coordinates(peak_locations, arr2D, amp_min)
+    
+    return coordinates
 
 def get_2D_peaks(arr2D: np.array, plot: bool = False, amp_min: int = DEFAULT_AMP_MIN)\
         -> List[Tuple[List[int], List[int]]]:

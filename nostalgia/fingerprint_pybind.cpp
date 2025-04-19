@@ -11,6 +11,8 @@
 #include <string>
 #include <tuple>
 #include <vector>
+#include <pybind11/numpy.h>
+#include <algorithm>
 
 namespace py = pybind11;
 
@@ -184,6 +186,148 @@ generate_hashes_test(const std::vector<std::tuple<int, int>> &peaks,
   return std::make_tuple(hashes, execution_time);
 }
 
+
+std::tuple<py::array_t<bool>, py::array_t<double>> 
+get_2D_peaks_cpp(py::array_t<double> spectrogram, double fraction = 0.1, int condition = 2, double amp_min = 10) {
+    py::buffer_info buf = spectrogram.request();
+    if (buf.ndim != 2) {
+        throw std::runtime_error("Number of dimensions must be 2");
+    }
+    
+    size_t rows = buf.shape[0];
+    size_t cols = buf.shape[1];
+    double* data = static_cast<double*>(buf.ptr);
+    
+    py::array_t<bool> peak_locations = py::array_t<bool>({rows, cols});
+    py::array_t<double> peak_values = py::array_t<double>({rows, cols});
+    
+    py::buffer_info peak_loc_buf = peak_locations.request();
+    py::buffer_info peak_val_buf = peak_values.request();
+    
+    bool* peak_loc_ptr = static_cast<bool*>(peak_loc_buf.ptr);
+    double* peak_val_ptr = static_cast<double*>(peak_val_buf.ptr);
+  
+    std::fill(peak_loc_ptr, peak_loc_ptr + rows * cols, false);
+    std::fill(peak_val_ptr, peak_val_ptr + rows * cols, 0.0);
+    if (condition == 0 || condition == 2) {
+        int distance = static_cast<int>(fraction * rows);
+        #pragma omp parallel for
+        for (size_t col = 0; col < cols; col++) {
+            std::vector<std::pair<double, size_t>> col_values(rows);
+
+            for (size_t row = 0; row < rows; row++) {
+                col_values[row] = {data[row * cols + col], row};
+            }
+
+            std::sort(col_values.begin(), col_values.end(), 
+                      [](const auto& a, const auto& b) { return a.first > b.first; });
+            std::vector<bool> used(rows, false);
+            for (const auto& [val, idx] : col_values) {
+                if (val <= amp_min) break;
+                bool can_use = true;
+                for (int d = -distance; d <= distance; d++) {
+                    int check_idx = idx + d;
+                    if (check_idx >= 0 && check_idx < static_cast<int>(rows) && used[check_idx]) {
+                        can_use = false;
+                        break;
+                    }
+                }
+                if (can_use) {
+                    used[idx] = true;
+                    if (condition == 0) {
+                        peak_loc_ptr[idx * cols + col] = true;
+                        peak_val_ptr[idx * cols + col] = val;
+                    }
+                }
+            }
+        }
+    }
+    
+    if (condition == 1 || condition == 2) {
+        int distance = static_cast<int>(fraction * cols);
+
+        #pragma omp parallel for
+        for (size_t row = 0; row < rows; row++) {
+            std::vector<std::pair<double, size_t>> row_values(cols);
+            for (size_t col = 0; col < cols; col++) {
+                row_values[col] = {data[row * cols + col], col};
+            }
+            std::sort(row_values.begin(), row_values.end(), 
+                      [](const auto& a, const auto& b) { return a.first > b.first; });
+            std::vector<bool> used(cols, false);
+            for (const auto& [val, idx] : row_values) {
+                if (val <= amp_min) break;
+                bool can_use = true;
+                for (int d = -distance; d <= distance; d++) {
+                    int check_idx = idx + d;
+                    if (check_idx >= 0 && check_idx < static_cast<int>(cols) && used[check_idx]) {
+                        can_use = false;
+                        break;
+                    }
+                }
+                
+                if (can_use) {
+                    used[idx] = true;
+                    if (condition == 1) {
+                        peak_loc_ptr[row * cols + idx] = true;
+                        peak_val_ptr[row * cols + idx] = val;
+                    } else if (condition == 2 && peak_loc_ptr[row * cols + idx]) {
+                        peak_val_ptr[row * cols + idx] = val;
+                    }
+                }
+            }
+        }
+    }
+    
+    if (condition == 2) {
+        #pragma omp parallel for collapse(2)
+        for (size_t row = 0; row < rows; row++) {
+            for (size_t col = 0; col < cols; col++) {
+                size_t idx = row * cols + col;
+                double val = data[idx];
+                if (peak_loc_ptr[idx] && val > amp_min) {
+                    peak_loc_ptr[idx] = true;
+                    peak_val_ptr[idx] = val;
+                } else {
+                    peak_loc_ptr[idx] = false;
+                    peak_val_ptr[idx] = 0.0;
+                }
+            }
+        }
+    }
+    
+    return std::make_tuple(peak_locations, peak_values);
+}
+
+std::vector<std::tuple<int, int>> 
+peaks_to_coordinates(py::array_t<bool> peak_locations, py::array_t<double> spectrogram, double amp_min = 10) {
+    py::buffer_info loc_buf = peak_locations.request();
+    py::buffer_info spec_buf = spectrogram.request();
+    
+    if (loc_buf.ndim != 2 || spec_buf.ndim != 2) {
+        throw std::runtime_error("Input arrays must be 2-dimensional");
+    }
+    
+    size_t rows = loc_buf.shape[0];
+    size_t cols = loc_buf.shape[1];
+    
+    bool* loc_ptr = static_cast<bool*>(loc_buf.ptr);
+    double* spec_ptr = static_cast<double*>(spec_buf.ptr);
+    
+    std::vector<std::tuple<int, int>> coordinates;
+    
+    for (size_t row = 0; row < rows; row++) {
+        for (size_t col = 0; col < cols; col++) {
+            size_t idx = row * cols + col;
+            if (loc_ptr[idx] && spec_ptr[idx] > amp_min) {
+                coordinates.emplace_back(row, col);
+            }
+        }
+    }
+    
+    return coordinates;
+}
+
 PYBIND11_MODULE(fingerprint_pybind, m) {
   m.doc() = "pybind11 extension for audio fingerprinting";
 
@@ -194,4 +338,18 @@ PYBIND11_MODULE(fingerprint_pybind, m) {
         py::arg("fingerprint_reduction") = 20,
         "Generate fingerprint hashes from peaks with corresponding time "
         "offsets");
+  
+  // Add the new functions
+  m.def("get_2D_peaks_cpp", &get_2D_peaks_cpp, 
+        py::arg("spectrogram"), 
+        py::arg("fraction") = 0.1, 
+        py::arg("condition") = 2,
+        py::arg("amp_min") = 10,
+        "Find peaks in a spectrogram using a similar approach to scipy.signal.find_peaks");
+  
+  m.def("peaks_to_coordinates", &peaks_to_coordinates,
+        py::arg("peak_locations"),
+        py::arg("spectrogram"),
+        py::arg("amp_min") = 10,
+        "Convert peak locations to frequency-time coordinate pairs");
 }
