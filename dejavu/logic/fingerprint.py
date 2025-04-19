@@ -57,7 +57,7 @@ def fingerprint(channel_samples: List[int],
 
     # Use C++ implementation if available, otherwise use Python implementation
     if USE_CPP_IMPLEMENTATION:
-        return cpp_generate_hashes(
+        hashes, execution_time = cpp_generate_hashes(
             local_maxima, 
             fan_value=fan_value,
             peak_sort=PEAK_SORT,
@@ -65,6 +65,8 @@ def fingerprint(channel_samples: List[int],
             max_hash_time_delta=MAX_HASH_TIME_DELTA,
             fingerprint_reduction=FINGERPRINT_REDUCTION
         )
+        print(f"Execution time: {execution_time} seconds")
+        return hashes
     else:
         return generate_hashes_py(local_maxima, fan_value=fan_value)
 
