@@ -37,8 +37,9 @@ def test_with_peaks(peaks, description=""):
     print(f"C++: {len(cpp_hashes)} hashes in {cpp_internal_time:.4f}s")
     print(f"Speedup: {py_time / cpp_internal_time:.2f}x")
     
-    results_match = len(py_hashes) == len(cpp_hashes)
-    print(f"Results match: {results_match}")
+    for i in range(len(py_hashes)):
+        if i > len(cpp_hashes) or py_hashes[i] != cpp_hashes[i]:
+            print(f"Mismatch at index {i}: Python={py_hashes[i]}, C++={cpp_hashes[i]}")
     
     return py_time, cpp_internal_time
 
