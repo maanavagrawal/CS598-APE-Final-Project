@@ -199,7 +199,9 @@ def generate_hashes_py(peaks: List[Tuple[int, int]], fan_value: int = DEFAULT_FA
                 t_delta = t2 - t1
 
                 if MIN_HASH_TIME_DELTA <= t_delta <= MAX_HASH_TIME_DELTA:
-                    h = hashlib.sha1(f"{str(freq1)}|{str(freq2)}|{str(t_delta)}".encode('utf-8'))
-                    hashes.append((h.hexdigest()[0:FINGERPRINT_REDUCTION], t1))
+                    hashstr = f"{str(freq1)}|{str(freq2)}|{str(t_delta)}".encode('utf-8')
+                    h = hashlib.sha1(hashstr)
+                    hash_str = h.hexdigest()[0:FINGERPRINT_REDUCTION]
+                    hashes.append((hash_str, t1))
 
     return hashes

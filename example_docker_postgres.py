@@ -137,7 +137,8 @@ def process_audio_files_modal():
     subprocess.run("lscpu", shell=True)
     
     try:
-        subprocess.run("cd /root/nostalgia && python3 setup.py build_ext --inplace", shell=True, check=True)
+        subprocess.run("cd /root/nostalgia && rm -f *.so && python3 setup.py clean --all && python3 setup.py build_ext --inplace", shell=True, check=True)
+
         print("Successfully built C++ extension")
     except subprocess.CalledProcessError as e:
         print(f"Failed to build C++ extension: {e}")

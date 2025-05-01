@@ -1,6 +1,7 @@
 import os
 from setuptools import find_packages, setup
 from pybind11.setup_helpers import Pybind11Extension, build_ext
+import pybind11
 
 
 def parse_requirements(requirements_path):
@@ -14,9 +15,9 @@ ext_modules = [
     Pybind11Extension(
         'fingerprint_pybind',
         ['fingerprint_pybind.cpp', 'hash/sha1.c'],
-        include_dirs=['hash'],
+        include_dirs=['hash', pybind11.get_include()],
         libraries=['gomp'],
-        extra_compile_args=['-std=c++17', '-O3', '-fopenmp', '-g'],
+        extra_compile_args=['-std=c++17', '-O3', '-fopenmp', '-g', '-Wall', '-Wextra'],
         extra_link_args=['-fopenmp'],
     )
 ]
