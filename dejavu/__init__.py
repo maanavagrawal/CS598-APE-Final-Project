@@ -71,7 +71,6 @@ class Dejavu:
         :param extensions: list of file extensions to consider.
         :param nprocesses: amount of processes to fingerprint the files within the directory.
         """
-        # Try to use the maximum amount of processes if not given.
         try:
             nprocesses = nprocesses or multiprocessing.cpu_count()
         except NotImplementedError:
@@ -79,44 +78,62 @@ class Dejavu:
         else:
             nprocesses = 1 if nprocesses <= 0 else nprocesses
 
-        pool = multiprocessing.Pool(nprocesses)
+        try:
+            import cupy as cp
+            cp.cuda.Device(0).use()
+            print("GPU initialized in main process")
+            os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+            nprocesses = 1
+            print("Using single process mode with GPU")
+        except Exception as e:
+            print(f"GPU initialization failed in main process: {e}")
+            print("Continuing without GPU")
 
-        filenames_to_fingerprint = []
-        for filename, _ in decoder.find_files(path, extensions):
-            # don't refingerprint already fingerprinted files
-            if decoder.unique_hash(filename) in self.songhashes_set:
-                print(f"{filename} already fingerprinted, continuing...")
-                continue
+        if nprocesses > 1:
+            pool = multiprocessing.Pool(nprocesses)
 
-            filenames_to_fingerprint.append(filename)
+            filenames_to_fingerprint = []
+            for filename, _ in decoder.find_files(path, extensions):
+                if decoder.unique_hash(filename) in self.songhashes_set:
+                    print(f"{filename} already fingerprinted, continuing...")
+                    continue
 
-        # Prepare _fingerprint_worker input
-        worker_input = list(zip(filenames_to_fingerprint, [self.limit] * len(filenames_to_fingerprint)))
+                filenames_to_fingerprint.append(filename)
 
-        # Send off our tasks
-        iterator = pool.imap_unordered(Dejavu._fingerprint_worker, worker_input)
+            worker_input = list(zip(filenames_to_fingerprint, [self.limit] * len(filenames_to_fingerprint)))
 
-        # Loop till we have all of them
-        while True:
-            try:
-                song_name, hashes, file_hash = next(iterator)
-            except multiprocessing.TimeoutError:
-                continue
-            except StopIteration:
-                break
-            except Exception:
-                print("Failed fingerprinting")
-                # Print traceback because we can't reraise it here
-                traceback.print_exc(file=sys.stdout)
-            else:
+            iterator = pool.imap_unordered(Dejavu._fingerprint_worker, worker_input)
+
+            while True:
+                try:
+                    song_name, hashes, file_hash = next(iterator)
+                except multiprocessing.TimeoutError:
+                    continue
+                except StopIteration:
+                    break
+                except Exception:
+                    print("Failed fingerprinting")
+                    traceback.print_exc(file=sys.stdout)
+                else:
+                    sid = self.db.insert_song(song_name, file_hash, len(hashes))
+
+                    self.db.insert_hashes(sid, hashes)
+                    self.db.set_song_fingerprinted(sid)
+                    self.__load_fingerprinted_audio_hashes()
+
+            pool.close()
+            pool.join()
+        else:
+            for filename, _ in decoder.find_files(path, extensions):
+                if decoder.unique_hash(filename) in self.songhashes_set:
+                    print(f"{filename} already fingerprinted, continuing...")
+                    continue
+
+                song_name, hashes, file_hash = Dejavu._fingerprint_worker((filename, self.limit))
                 sid = self.db.insert_song(song_name, file_hash, len(hashes))
-
                 self.db.insert_hashes(sid, hashes)
                 self.db.set_song_fingerprinted(sid)
                 self.__load_fingerprinted_audio_hashes()
-
-        pool.close()
-        pool.join()
 
     def fingerprint_file(self, file_path: str, song_name: str = None) -> None:
         """

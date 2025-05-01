@@ -15,6 +15,7 @@
 #include <tuple>
 #include <vector>
 #include <limits>
+#include <iostream>
 
 namespace py = pybind11;
 
@@ -52,7 +53,7 @@ generate_hashes(const std::vector<std::tuple<int, int>> &peaks,
 
   if (peak_sort) {
     sorted_peaks = peaks;
-    std::sort(sorted_peaks.begin(), sorted_peaks.end(),
+    std::stable_sort(sorted_peaks.begin(), sorted_peaks.end(),
               [](const std::tuple<int, int> &a, const std::tuple<int, int> &b) {
                 return std::get<1>(a) < std::get<1>(b);
               });
@@ -61,10 +62,8 @@ generate_hashes(const std::vector<std::tuple<int, int>> &peaks,
   }
 
   size_t total_peaks = sorted_peaks.size();
-  size_t max_hashes = total_peaks * (fan_value - 1);
-
   std::vector<size_t> offsets(total_peaks, 0);
-// compute offsets
+
 #pragma omp parallel for
   for (size_t i = 0; i < total_peaks; i++) {
     size_t num_hashes_per_peak = 0;
