@@ -71,7 +71,6 @@ class Dejavu:
         :param extensions: list of file extensions to consider.
         :param nprocesses: amount of processes to fingerprint the files within the directory.
         """
-        # Try to use the maximum amount of processes if not given.
         try:
             nprocesses = nprocesses or multiprocessing.cpu_count()
         except NotImplementedError:
@@ -79,14 +78,11 @@ class Dejavu:
         else:
             nprocesses = 1 if nprocesses <= 0 else nprocesses
 
-        # Initialize GPU in the main process first
         try:
             import cupy as cp
             cp.cuda.Device(0).use()
             print("GPU initialized in main process")
-            # Set environment variable to indicate GPU is initialized
             os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-            # Force single process when using GPU
             nprocesses = 1
             print("Using single process mode with GPU")
         except Exception as e:
@@ -98,20 +94,16 @@ class Dejavu:
 
             filenames_to_fingerprint = []
             for filename, _ in decoder.find_files(path, extensions):
-                # don't refingerprint already fingerprinted files
                 if decoder.unique_hash(filename) in self.songhashes_set:
                     print(f"{filename} already fingerprinted, continuing...")
                     continue
 
                 filenames_to_fingerprint.append(filename)
 
-            # Prepare _fingerprint_worker input
             worker_input = list(zip(filenames_to_fingerprint, [self.limit] * len(filenames_to_fingerprint)))
 
-            # Send off our tasks
             iterator = pool.imap_unordered(Dejavu._fingerprint_worker, worker_input)
 
-            # Loop till we have all of them
             while True:
                 try:
                     song_name, hashes, file_hash = next(iterator)
@@ -121,7 +113,6 @@ class Dejavu:
                     break
                 except Exception:
                     print("Failed fingerprinting")
-                    # Print traceback because we can't reraise it here
                     traceback.print_exc(file=sys.stdout)
                 else:
                     sid = self.db.insert_song(song_name, file_hash, len(hashes))
@@ -133,7 +124,6 @@ class Dejavu:
             pool.close()
             pool.join()
         else:
-            # Single process mode
             for filename, _ in decoder.find_files(path, extensions):
                 if decoder.unique_hash(filename) in self.songhashes_set:
                     print(f"{filename} already fingerprinted, continuing...")
