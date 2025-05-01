@@ -9,5 +9,7 @@ clean:
 build:
 	python3 setup.py build_ext --inplace
 
-test:
+test_all:
+	python3 test_fingerprint_pybind.py
+test_cpp:
 	python3 test_fingerprint_cpp_version.py
