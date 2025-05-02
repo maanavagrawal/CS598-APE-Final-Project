@@ -7,8 +7,7 @@ pip3 install -r requirements.txt
 
 How to run:
 ```
-cd nostalgia
-python3 setup.py build_ext --inplace
+modal run example_docker_postgres.py
 ```
 **Test C++ implementation:**
 ```
