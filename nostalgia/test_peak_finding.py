@@ -26,26 +26,21 @@ def test_real_audio_spectrogram():
         mp3_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mp3", "Brad-Sucks--Total-Breakdown.mp3")
         print(f"Loading MP3 file: {mp3_path}")
         
-        # Load MP3 and convert to numpy array
         audio = AudioSegment.from_mp3(mp3_path)
         sample_rate = audio.frame_rate
         audio_data = np.array(audio.get_array_of_samples())
         
-        # Convert stereo to mono if needed
         if len(audio_data.shape) > 1:
             audio_data = np.mean(audio_data, axis=1)
         
-        # Just use a smaller segment to make testing faster
-        segment_length = 5 * sample_rate  # 5 seconds
+        segment_length = 5 * sample_rate
         audio_segment = audio_data[:segment_length] if len(audio_data) > segment_length else audio_data
         
         print(f"Audio: sample rate={sample_rate}Hz, duration={len(audio_segment)/sample_rate:.2f}s")
         
-        # Create spectrogram
         window_size = 2048
         overlap = window_size // 2
         
-        # Create spectrogram using scipy.signal
         frequencies, times, spectrogram = signal.spectrogram(
             audio_segment, 
             fs=sample_rate, 
@@ -55,35 +50,27 @@ def test_real_audio_spectrogram():
             detrend=False
         )
         
-        # Convert to dB scale
         spectrogram_db = 10 * np.log10(spectrogram + 1e-10)
         
         print(f"Spectrogram shape: {spectrogram_db.shape}")
         print(f"Value range: {np.min(spectrogram_db):.2f} to {np.max(spectrogram_db):.2f}")
         
-        # Set a threshold for peak detection
         amp_min = np.mean(spectrogram_db) + 2 * np.std(spectrogram_db)
         print(f"Peak amplitude threshold: {amp_min:.2f} dB")
         
-        # Ensure we're using float64 (double precision) for C++
         spectrogram_db = spectrogram_db.astype(np.float64)
         
-        # Time the Python implementation
         py_start_time = time.time()
         py_peaks = get_2D_peaks_py(spectrogram_db, amp_min=amp_min)
         py_time = time.time() - py_start_time
         
-        # Get peaks and timing from C++ implementation
         cpp_peaks, cpp_time = peak_finding_to_coordinates(spectrogram_db, amp_min=amp_min)
         
-        # Convert to sets for comparison
         py_peaks_set = convert_to_python_types(py_peaks)
         cpp_peaks_set = convert_to_python_types(cpp_peaks)
         
-        # Calculate overlap
         overlap_peaks = py_peaks_set.intersection(cpp_peaks_set)
         
-        # Print results
         print("\n----- PERFORMANCE RESULTS -----")
         print(f"Python implementation: {len(py_peaks_set)} peaks in {py_time:.6f} seconds")
         print(f"C++ implementation: {len(cpp_peaks_set)} peaks in {cpp_time:.6f} seconds")
@@ -91,14 +78,12 @@ def test_real_audio_spectrogram():
         print(f"\n----- ACCURACY RESULTS -----")
         print(f"Overlap: {len(overlap_peaks)} peaks in common ({len(overlap_peaks)/len(py_peaks_set)*100:.1f}% of Python peaks)")
         
-        # Sample peak output
         print("\nSample Python peaks:")
         for i, peak in enumerate(list(py_peaks_set)[:5]):
             r, c = peak
             val = spectrogram_db[r, c]
             print(f"  Peak {i+1}: ({r}, {c}) - value: {val:.2f}")
             
-        # Sample C++ peaks
         print("\nSample C++ peaks:")
         for i, peak in enumerate(list(cpp_peaks_set)[:5]):
             r, c = peak

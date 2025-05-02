@@ -197,7 +197,6 @@ peak_finding_to_coordinates(py::array_t<double> spectrogram,
                             double amp_min = 10) {
   using namespace std::chrono;
   auto start_time = high_resolution_clock::now();
-  
   py::buffer_info buf = spectrogram.request();
   
   if (buf.ndim != 2) {
@@ -210,12 +209,10 @@ peak_finding_to_coordinates(py::array_t<double> spectrogram,
   bool is_fortran_order = (buf.strides[0] < buf.strides[1]);
   
   std::vector<std::tuple<int, int>> peaks;
-  peaks.reserve(rows * cols / 100); // Reserve space for expected peaks
+  peaks.reserve(rows * cols / 100);
   
   const int neighborhood_size = 5;
   const int total_neighbors = (2 * neighborhood_size + 1) * (2 * neighborhood_size + 1) - 1;
-  
-  // Pre-compute neighbor offsets for better memory access
   std::vector<std::pair<int, int>> neighbor_offsets;
   neighbor_offsets.reserve(total_neighbors);
   for (int di = -neighborhood_size; di <= neighborhood_size; di++) {
@@ -229,11 +226,9 @@ peak_finding_to_coordinates(py::array_t<double> spectrogram,
     for (size_t j = neighborhood_size; j < cols - neighborhood_size; j++) {
       size_t idx = is_fortran_order ? (i + j * rows) : (i * cols + j);
       double center = data[idx];
-      
       if (center <= amp_min) {
         continue;
       }
-      
       bool is_max = true;
       for (const auto& [di, dj] : neighbor_offsets) {
         int ni = i + di;
@@ -248,7 +243,6 @@ peak_finding_to_coordinates(py::array_t<double> spectrogram,
           }
         }
       }
-      
       if (is_max) {
         peaks.emplace_back(i, j);
       }
@@ -257,12 +251,11 @@ peak_finding_to_coordinates(py::array_t<double> spectrogram,
   
   auto end_time = high_resolution_clock::now();
   double execution_time = duration_cast<microseconds>(end_time - start_time).count() / 1000000.0;
-  
   return std::make_tuple(peaks, execution_time);
 }
 
 // /* 
-//  * DEPRECATED: Old implementation with memory layout issues 
+//  * DEPRECATED: Old implementation with some memory layout issues 
 //  * This function is kept for reference but not used
 //  */
 // std::vector<int> find_peaks(const double *spectrogram, double amp_min,
