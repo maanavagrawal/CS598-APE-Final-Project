@@ -39,6 +39,15 @@ except ImportError:
     USE_CPP_IMPLEMENTATION = False
     print("Using Python implementation")
 
+try:
+    from .fingerprint_cython import generate_hashes_cython
+    USE_CYTHON = True
+    print("Using Cython implementation")
+except ImportError:
+    USE_CYTHON = False
+    print("Using Python implementation")
+
+
 _gpu_initialized = False
 _cp = None
 _maximum_filter = None
@@ -182,6 +191,9 @@ def generate_hashes_py(peaks: List[Tuple[int, int]], fan_value: int = DEFAULT_FA
        sha1_hash[0:FINGERPRINT_REDUCTION]    time_offset
         [(e05b341a9b77a51fd26, 32), ... ]
     """
+    if USE_CYTHON:
+        return generate_hashes_cython(peaks, fan_value)
+        
     idx_freq = 0
     idx_time = 1
 
