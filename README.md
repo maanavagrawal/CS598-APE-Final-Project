@@ -7,11 +7,12 @@ pip3 install -r requirements.txt
 
 How to run:
 ```
-cd nostalgia
-python3 setup.py build_ext --inplace
+modal run example_docker_postgres.py
 ```
 
 
+
+Will need to create Modal account and set up secret token that you will be prompted to enter when you run the above command.
 
 **Test C++ implementation:**
 ```
