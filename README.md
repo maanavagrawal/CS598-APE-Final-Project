@@ -9,6 +9,8 @@ How to run:
 ```
 modal run example_docker_postgres.py
 ```
+Will need to create Modal account and set up secret token that you will be prompted to enter when you run the above command.
+
 **Test C++ implementation:**
 ```
 python3 test_fingerprint_pybind.py
