@@ -49,6 +49,13 @@ generate_hashes(const std::vector<std::tuple<int, int>> &peaks,
                 int fingerprint_reduction = 20) {
   using namespace std::chrono;
   auto start_time = high_resolution_clock::now();
+  
+  if (peaks.empty() || peaks.size() < 2) {
+    auto end_time = high_resolution_clock::now();
+    double execution_time = duration_cast<microseconds>(end_time - start_time).count() / 1000000.0;
+    return std::make_tuple(std::vector<std::tuple<std::string, int>>(), execution_time);
+  }
+  
   std::vector<std::tuple<int, int>> sorted_peaks;
 
   if (peak_sort) {
@@ -92,6 +99,11 @@ generate_hashes(const std::vector<std::tuple<int, int>> &peaks,
   // for (const auto &i : result) {
   //   std::cerr << i << std::endl;
   // }
+  if (result.empty()) {
+    auto end_time = high_resolution_clock::now();
+    double execution_time = duration_cast<microseconds>(end_time - start_time).count() / 1000000.0;
+    return std::make_tuple(std::vector<std::tuple<std::string, int>>(), execution_time);
+  }
   std::vector<std::tuple<std::string, int>> hashes(result.back());
 
 #pragma omp parallel for schedule(dynamic, 100)
